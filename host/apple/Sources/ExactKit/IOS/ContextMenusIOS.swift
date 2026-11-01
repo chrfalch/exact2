@@ -60,9 +60,9 @@ final class ContextMenuHost: NSObject, UIContextMenuInteractionDelegate, UIEditM
         var home = CGRect.zero
         var dropped = false
         var controller: PreviewController?
-        /// The picture UIKit lifts (`targeted`) and the node it shows, hidden
-        /// under it while the menu is up, with the opacity it had.
-        var lifted: (picture: UIView, node: UIView, alpha: CGFloat)?
+        /// The preview of an inline run UIKit lifts (`targeted`): its picture
+        /// and path stay the same from the lift to the dismissal.
+        var runPreview: UITargetedPreview?
         /// Whether the preview was tapped, and whether its press navigated.
         var committed = false, navigated = false
         init(source: NodeView, popover: NodeView, name: String, point: CGPoint, inlineID: UInt32? = nil) {
@@ -422,7 +422,6 @@ final class ContextMenuHost: NSObject, UIContextMenuInteractionDelegate, UIEditM
     /// The lifted row back in its popover, hidden with it.
     private func restore(_ owner: Open) {
         menus?.coverClosed()
-        if let lifted = owner.lifted { owner.lifted = nil; if lifted.node.alpha == 0 { lifted.node.alpha = lifted.alpha } }
         if let pop = owner.popover, owner.toggled { owner.toggled = false; presenter?.popoverEvents.changed(pop, open: false) }
         if owner.keyboardConfiguration != nil {
             keyboardInteraction.view?.removeInteraction(keyboardInteraction)
@@ -444,40 +443,45 @@ final class ContextMenuHost: NSObject, UIContextMenuInteractionDelegate, UIEditM
         }
     }
 
-    /// UIKit lifts a picture of the node, clipped to its corners, from the
-    /// node's place. Not the node itself: UIKit's live view of a node in a
-    /// list showed a blank platter for a multi-line chat bubble, and a
-    /// bubble's fill went missing in dark mode (r28's chat). The node hides
-    /// under its picture while the menu shows, as UIKit hides a lifted view;
-    /// an inline run's paragraph stays, the rest of it still showing.
+    /// UIKit lifts the node itself, live, clipped to its outline (LLP 1021
+    /// §5.1): it hides the node, lifts it above every ancestor and returns
+    /// it. A run of text cannot lift its paragraph, which UIKit would hide
+    /// whole: it lifts a picture of the run's lines and UIKit's margin,
+    /// centered on them in the paragraph's superview (UIKit shows nothing for
+    /// a picture targeted at the window), and the paragraph stays shown.
     private func targeted(_ configuration: UIContextMenuConfiguration) -> UITargetedPreview? {
         guard let owner = open, let source = owner.source, live(source), (owner.touched ?? source).window != nil,
               (configuration.identifier as? NSNumber)?.uint32Value == (owner.inlineID ?? source.id) else { return nil }
-        let parameters = UIPreviewParameters()
         let shown = owner.touched.flatMap { $0.window == nil ? nil : $0 } ?? source
-        if let id = owner.inlineID, let run = presenter?.inlineText(id) {
-            let path = UIBezierPath()
-            source.inlineRects(run).forEach { path.append(UIBezierPath(rect: $0)) }
+        if let id = owner.inlineID, let run = presenter?.inlineText(id), let parent = source.superview {
+            // A picture of only the run's lines and UIKit's margin around
+            // them, centered on them: UIKit lifts the visible path at the
+            // target's center.
+            let parameters = UIPreviewParameters(textLineRects: source.inlineRects(run).map { NSValue(cgRect: $0) })
+            guard let path = parameters.visiblePath?.copy() as? UIBezierPath, !path.bounds.isEmpty else { return nil }
+            let area = path.bounds
+            // `convert` applies the paragraph's whole transform: the target
+            // adds only its scale and rotation.
+            var linear = source.transform
+            linear.tx = 0
+            linear.ty = 0
+            let target = UIPreviewTarget(container: parent, center: source.convert(CGPoint(x: area.midX, y: area.midY), to: parent), transform: linear)
+            // The lift's picture and path, at the run's place now
+            if let lifted = owner.runPreview { return lifted.retargetedPreview(with: target) }
+            guard let picture = source.resizableSnapshotView(from: area, afterScreenUpdates: false, withCapInsets: .zero) else { return nil }
+            path.apply(CGAffineTransform(translationX: -area.minX, y: -area.minY))
             parameters.visiblePath = path
+            let preview = UITargetedPreview(view: picture, parameters: parameters, target: target)
+            owner.runPreview = preview
+            return preview
         }
-        let radius = shown.layer.cornerRadius
-        if radius > 0, parameters.visiblePath == nil { parameters.visiblePath = UIBezierPath(roundedRect: shown.bounds, cornerRadius: radius) }
-        guard let window = shown.window, let parent = shown.superview else { return UITargetedPreview(view: shown, parameters: parameters) }
-        if owner.lifted?.node !== shown, let picture = shown.snapshotView(afterScreenUpdates: false) {
-            if let lifted = owner.lifted, lifted.node.alpha == 0 { lifted.node.alpha = lifted.alpha }
-            owner.lifted = (picture, shown, shown.alpha)
+        let parameters = UIPreviewParameters()
+        if let node = shown as? NodeView {
+            if node.cornerRadii(in: node.bounds).contains(where: { $0 > 0 }) { parameters.visiblePath = node.roundedPath(in: node.bounds) }
+        } else if shown.layer.cornerRadius > 0 {
+            parameters.visiblePath = UIBezierPath(roundedRect: shown.bounds, cornerRadius: shown.layer.cornerRadius)
         }
-        guard let lifted = owner.lifted else { return UITargetedPreview(view: shown, parameters: parameters) }
-        // From the node's place but over the window, so an ancestor that scrolls sideways does not clip the picture as
-        // it grows; its transform is the node's with each ancestor's scale and rotation, and converting the centre takes
-        // the translations.
-        var transform = shown.transform
-        for ancestor in sequence(first: parent, next: { $0.superview }) where ancestor !== window {
-            let t = ancestor.transform
-            transform = transform.concatenating(CGAffineTransform(a: t.a, b: t.b, c: t.c, d: t.d, tx: 0, ty: 0))
-        }
-        let target = UIPreviewTarget(container: window, center: parent.convert(shown.center, to: window), transform: transform)
-        return UITargetedPreview(view: lifted.picture, parameters: parameters, target: target)
+        return UITargetedPreview(view: shown, parameters: parameters)
     }
     func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configuration: UIContextMenuConfiguration, highlightPreviewForItemWithIdentifier identifier: NSCopying) -> UITargetedPreview? {
         targeted(configuration)
@@ -555,7 +559,6 @@ final class ContextMenuHost: NSObject, UIContextMenuInteractionDelegate, UIEditM
     func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willDisplayMenuFor configuration: UIContextMenuConfiguration, animator: UIContextMenuInteractionAnimating?) {
         menus?.focus.setAside()
         if let owner = open, let pop = owner.popover { owner.toggled = true; presenter?.popoverEvents.changed(pop, open: true) }
-        if let owner = open, owner.inlineID == nil, let lifted = owner.lifted { lifted.node.alpha = 0 } // under its picture (`targeted`)
     }
 
     func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willEndFor configuration: UIContextMenuConfiguration, animator: UIContextMenuInteractionAnimating?) {
@@ -563,10 +566,7 @@ final class ContextMenuHost: NSObject, UIContextMenuInteractionDelegate, UIEditM
         if let animator { animator.addCompletion(focus) } else { focus() }
         guard let owner = open, owner.configuration === configuration else { return }
         if let pop = owner.popover, owner.toggled { owner.toggled = false; presenter?.popoverEvents.changed(pop, open: false) }
-        let lifted = owner.lifted
         let finish = { [weak self, weak owner] in
-            // Shown again even when another menu has opened since.
-            if let lifted, lifted.node.alpha == 0 { lifted.node.alpha = lifted.alpha }
             guard let self, let owner, self.open === owner else { return }
             self.restore(owner)
             self.open = nil

@@ -913,12 +913,19 @@ menu's glass and the dismissal. In the delegate:
   its animator's completion. A hidden row, or no row,
   means no preview, and UIKit's own lifted node is the preview. Two rows
   are refused, logged as `context menu <id> refused a preview: …`.
-- The **targeted preview** (highlight and dismissal) is the node itself
-  (`UITargetedPreview(view:)`), with a `visiblePath` for its
-  `border-radius`, so the lift and the morph are Apple's. After a commit
-  that navigated, the dismissal has no target: the node is under the new
-  screen, as Signal's is under the conversation. After a press that
-  stayed, the dismissal returns to the node.
+- The **targeted preview** (highlight and dismissal) is the node itself,
+  live (`UITargetedPreview(view:)`), clipped to its `border-radius`
+  outline, so the lift, the morph and the return are Apple's: UIKit hides
+  the node and lifts it above every ancestor. A picture of the node would
+  show the press it was taken in. A text run that names a `contextPopover`
+  cannot lift its paragraph, which UIKit would hide whole: it lifts a
+  picture of the run's lines with UIKit's margin around them
+  (`UIPreviewParameters(textLineRects:)`), from their place in the
+  paragraph's superview. The picture is taken during the press, and an
+  ancestor that clips cuts it as it lifts. After a commit that navigated,
+  the dismissal has no target: the node is under the new screen, as
+  Signal's is under the conversation. After a press that stayed, the
+  dismissal returns to the node.
 - **The commit** (`willPerformPreviewActionForMenuWith`): if the preview row
   is still the popover's, enabled and has a `press`, it is pressed by view
   id, synchronously, with the navigation stack's own push animation off for

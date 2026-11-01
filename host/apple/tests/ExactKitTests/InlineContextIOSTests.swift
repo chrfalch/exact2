@@ -13,7 +13,10 @@ final class InlineContextIOSTests: XCTestCase {
         let session = ExactApp.shared.makeSession(label: "inline-menu")
         self.session = session
         let p = session.presenter
-        window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: 800))
+        // In the app's scene, so the window draws
+        let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+        window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow()
+        window.frame = CGRect(x: 0, y: 0, width: 400, height: 800)
         p.viewport.frame = window.bounds
         window.addSubview(p.viewport)
         window.makeKeyAndVisible()
@@ -175,11 +178,55 @@ final class InlineContextIOSTests: XCTestCase {
         defer { p.menus.reset(); window.isHidden = true }
         let node = try XCTUnwrap(p.views[2])
         node.layer.cornerRadius = 12
+        until("the paragraph is drawn, as one a person presses is") { node.snapshotView(afterScreenUpdates: false) != nil }
         let interaction = try XCTUnwrap(node.interactions.compactMap { $0 as? UIContextMenuInteraction }.first)
-        let rect = try XCTUnwrap(node.inlineRects(try XCTUnwrap(p.inlineText(10))).first)
+        let rects = node.inlineRects(try XCTUnwrap(p.inlineText(10)))
+        let rect = try XCTUnwrap(rects.first)
         let config = try XCTUnwrap(p.menus.context.contextMenuInteraction(interaction, configurationForMenuAtLocation: CGPoint(x: rect.midX, y: rect.midY)))
         let preview = try XCTUnwrap(p.menus.context.contextMenuInteraction(interaction, previewForHighlightingMenuWithConfiguration: config))
-        XCTAssertEqual(try XCTUnwrap(preview.parameters.visiblePath).bounds, rect)
+        let lines = try XCTUnwrap(UIPreviewParameters(textLineRects: rects.map { NSValue(cgRect: $0) }).visiblePath)
+        let area = lines.bounds
+        lines.apply(CGAffineTransform(translationX: -area.minX, y: -area.minY))
+        XCTAssertEqual(try XCTUnwrap(preview.parameters.visiblePath).cgPath, lines.cgPath, "UIKit's preview of the run's lines, in the picture")
+        XCTAssertTrue(preview.view !== node && preview.view.bounds.size == area.size,
+                      "a picture of the run's area: UIKit would hide all of a paragraph it lifted")
+        XCTAssertTrue(preview.target.container === node.superview && preview.target.center == node.convert(CGPoint(x: area.midX, y: area.midY), to: node.superview),
+                      "from the run's place in the paragraph's superview")
+        p.menus.context.contextMenuInteraction(interaction, willDisplayMenuFor: config, animator: nil)
+        XCTAssertEqual(node.alpha, 1, "the paragraph stays shown")
+        // The run's text changes while the menu shows
+        var style = InlineStyle()
+        try style.set("font_size", .number(18))
+        p.applyParagraph(2, [
+            InlineText(id: 10, parent: 2, props: ["text": "#a-longer-tag", "contextPopover": "tag-menu"], style: style, handlers: ["press", "contextmenu"], paints: true),
+            InlineText(id: 11, parent: 2, props: ["text": " plain text"], style: style, handlers: [], paints: true),
+        ])
+        let returned = try XCTUnwrap(p.menus.context.contextMenuInteraction(interaction, previewForDismissingMenuWithConfiguration: config))
+        XCTAssertTrue(returned.view === preview.view && returned.target.container === node.superview, "the same picture returns to the paragraph's place")
+        XCTAssertEqual(returned.parameters.visiblePath?.cgPath, preview.parameters.visiblePath?.cgPath, "with the path that fits it")
+    }
+
+    func testATransformedParagraphsRunLiftsFromItsPlace() throws {
+        let p = try presenter()
+        defer { p.menus.reset(); window.isHidden = true }
+        let node = try XCTUnwrap(p.views[2])
+        until("the paragraph is drawn") { node.snapshotView(afterScreenUpdates: false) != nil }
+        // A `translate` and a `scale`, as `PressFeedback` composes them
+        node.transform = CGAffineTransform(translationX: 30, y: 40).scaledBy(x: 1.5, y: 1.5)
+        let interaction = try XCTUnwrap(node.interactions.compactMap { $0 as? UIContextMenuInteraction }.first)
+        let rects = node.inlineRects(try XCTUnwrap(p.inlineText(10)))
+        let rect = try XCTUnwrap(rects.first)
+        let config = try XCTUnwrap(p.menus.context.contextMenuInteraction(interaction, configurationForMenuAtLocation: CGPoint(x: rect.midX, y: rect.midY)))
+        let preview = try XCTUnwrap(p.menus.context.contextMenuInteraction(interaction, previewForHighlightingMenuWithConfiguration: config))
+        let area = try XCTUnwrap(UIPreviewParameters(textLineRects: rects.map { NSValue(cgRect: $0) }).visiblePath).bounds
+        XCTAssertEqual(preview.target.center, node.convert(CGPoint(x: area.midX, y: area.midY), to: node.superview), "the run's place, translated once")
+        XCTAssertEqual(preview.target.transform, CGAffineTransform(scaleX: 1.5, y: 1.5), "the target adds the scale, not the translation again")
+    }
+
+    private func until(_ what: String, _ seconds: Double = 5, _ done: () -> Bool) {
+        let deadline = Date().addingTimeInterval(seconds)
+        while !done(), Date() < deadline { RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.02)) }
+        XCTAssertTrue(done(), what)
     }
 
     func testAWrappedRunsContextOffsetsKeepTheTargetsOrigin() throws {
