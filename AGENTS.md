@@ -103,8 +103,6 @@ section binds (`rules/RULES.md`, "Agents").
   Chrome-oracle Firefox/WebKit steps (`conform-firefox`, `conform-webkit`),
   the separate game workspace's locked tests, the UIKit XCTests, touch smoke and
   the tvOS and watchOS compiles
-  when a coalesced range changes anything outside `llp/`, `issues/`, `rules/`,
-  `docs/`, `QUEUE.md`, and `*.md` paths
   (`build.mjs --test --ios`; `build.mjs --tvos --no-install`, which builds and signs
   the Apple TV bundle and asks for no simulator; `build.mjs --watchos --no-install`,
   which builds and signs Caltrain's watch bundle with the pinned nightly and
@@ -112,7 +110,9 @@ section binds (`rules/RULES.md`, "Agents").
   Contract semantics (`semantics/README.md`: the Lean proofs, the extracted VM's, and
   `contract-difftest` running the runner and the web JS target against the Lean
   semantics; each skipped when its inputs are those of a run that passed,
-  `scripts/async-inputs.mjs`), then `metrics.mjs --long`. A second, hourly tier (`bun scripts/async.mjs --tier 2`) builds
+  `scripts/async-inputs.mjs`), then `metrics.mjs --long`. Of the tests, it runs those the
+  commits since the last one it checked can affect (`scripts/affected.mjs`, below), and every
+  step in full at least daily. A second, hourly tier (`bun scripts/async.mjs --tier 2`) builds
   the platforms that ride on another host's code: tvOS on the UIKit presenter
   (installed on an Apple TV simulator, which that machine must have),
   plus cross-target Cargo checks of the Linux host with every Linux app (`-p '*-linux'`)
@@ -128,6 +128,15 @@ section binds (`rules/RULES.md`, "Agents").
   app runs (the kernel, the runner, a host, the app itself), build and launch the apps it
   touches (`bun host/apple/build.mjs --ios <app>-apple --run`, `bun host/web/dev.mjs --app
   <app>`) and use them as a person would, with `scripts/agent.mjs` or by hand.
+- `bun scripts/affected.mjs` names the tests a branch's changes can affect, the working tree's
+  included, and the command for each: the Cargo packages', the Bun files, each app's
+  `.test.contract` files per host, the XCTests, Harmony's and the conformance apps; `--run`
+  runs the Cargo and Bun ones, `--why <suite>` says what selected it. A suite's inputs are what
+  it reads: its Cargo dependencies, its imports and what its tests name. Shared code naming an
+  app or a host builds what its caller asks for, so an Excord change runs Excord's tests and a
+  Linux host change runs no XCTest. It reads the source, so a read nothing names can escape it:
+  `--audit <suite>` runs one with the rest of the repository's units unreadable
+  (`docs/testing.md`). Advice, not a check.
 - An unset `EXACT_UPDATE_TRUST` bakes development trust, which checks only an
   origin named by `EXACT_UPDATE_ORIGIN`. `EXACT_UPDATE_TRUST=production` native
   bakes require an authenticated `EXACT_UPDATE_RECEIPT` or explicit new-stream
@@ -174,9 +183,9 @@ section binds (`rules/RULES.md`, "Agents").
   `exact-render`, …), `js/`, `gpu/` and most apps are
   not tested by it (the sixth check compiles them, their tests too, and runs none),
   and the async lane reports a failing test only after the push. When you touch one, or
-  what its tests read, run its tests before landing: `cargo test -p exact-linux --lib
-  --tests --no-fail-fast`, or `--bins` for a bin-only crate such as `exact-web-js`.
-  Advice, not a check.
+  what its tests read, run its tests before landing (`bun scripts/affected.mjs` names
+  them): `cargo test -p exact-linux --lib --tests --no-fail-fast`, or `--bins` for a
+  bin-only crate such as `exact-web-js`. Advice, not a check.
 - Verify by running, never by grepping. Fix loops get three rounds, then stop and say so.
 - To see a change work, drive the app: `bun scripts/agent.mjs <web|macos|ios|linux> tree
   "tap change-station" "type station-search Palo" "clock +60000" state logs "screenshot

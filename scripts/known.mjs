@@ -37,7 +37,8 @@ export const identity = (failure) => failure.slice(failure.indexOf(': ') + 2);
 /** The kind of test a check's command runs, which a local command of the same kind is compared with. */
 export function kindOf(command) {
   if (/\bbuild\.mjs\b.*--test\b/.test(command)) return 'xctest';
-  if (/\bcargo\b.*\btest\b/.test(command)) return 'cargo';
+  // (The async lane runs a selection's Rust tests through `affected.mjs --cargo-tests`.)
+  if (/\bcargo\b.*\btest\b|\baffected\.mjs --cargo-tests\b/.test(command)) return 'cargo';
   if (/\bbun\b.*\btest\b/.test(command)) return 'bun';
   return null;
 }
