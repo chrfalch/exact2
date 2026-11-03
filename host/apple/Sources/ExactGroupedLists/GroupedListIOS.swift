@@ -92,8 +92,7 @@ struct GroupedListModel: Equatable {
             if let color {
                 // Each appearance's side, a platform colour resolved by UIKit.
                 text.color = UIColor { traits in
-                    color.channels(dark: traits.userInterfaceStyle == .dark, contrast: traits.accessibilityContrast == .high)
-                        .map(TextEngine.color) ?? .label
+                    color.channels(in: traits, contrast: traits.accessibilityContrast == .high).map(TextEngine.color) ?? .label
                 }
             }
             if let font {
@@ -1208,7 +1207,7 @@ final class GroupedListView: NSObject, UICollectionViewDelegate {
         assign(toggle, \.isEnabled, node != nil && rows[id]?.disabled == false && node?.disabled == false && node?.inert == false)
         if !toggle.isEnabled || node?.ariaUnavailable == true { toggle.accessibilityTraits.insert(.notEnabled) }
         else { toggle.accessibilityTraits.remove(.notEnabled) }
-        assign(toggle, \.onTintColor, node?.channels("accent_color").map { TextEngine.color($0) })
+        assign(toggle, \.onTintColor, node?.accentUIColor(outside: true))
         assign(toggle, \.accessibilityIdentifier, node?.props["testId"])
     }
 

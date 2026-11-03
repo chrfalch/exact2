@@ -2250,11 +2250,16 @@ grey behind an alert or a sheet to say the screen under it is inert. **A
 colour of its own is for what means something by itself**: status
 (`-exact-system-green`, `-exact-system-red`), text hierarchy (`-exact-label`,
 `-exact-secondary-label`), data, and marks. A colour of its own never dims; on
-iOS the tint does where UIKit draws it, whoever set it (the root's
+iOS the tint does wherever it is drawn, whoever set it (the root's
 `accent-color` or a node's own), as UIKit greys a view's `tintColor`:
-controls, bars, symbols drawn in the tint, and a box shadow in `AccentColor`.
-A gradient or SVG paint in `AccentColor` is resolved by Exact to the app's
-accent and does not dim. Set the app's accent once, on the root:
+controls, bars, text, symbols, fills, shadows and SVG paints in `AccentColor`.
+These keep their colour: a gradient's stop in `AccentColor`, resolved to the
+app's accent; a face Exact bakes into a bar item's image, as UIKit keeps an
+original image's; and a node's own `accent-color` where UIKit draws it outside
+the node as a colour (the bar's title, a list row's switch, a route's backdrop,
+a bar readout's parts), since UIKit does not carry that tint there. A bar item,
+a tab bar and the bar's search field take such an accent as their own tint,
+which UIKit greys. Set the app's accent once, on the root:
 `accent-color` on the root element is the app's accent, and on iOS it is the
 window's tint, as an AccentColor asset is, so every `AccentColor`, bar, sheet
 and alert follows it. On Apple hosts only, an app may instead ship its accent
