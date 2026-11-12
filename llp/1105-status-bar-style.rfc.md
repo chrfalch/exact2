@@ -122,8 +122,8 @@ has no bar: the overrides are inert there.
 
 ## 3. Not doing
 
-Hiding the status bar (`prefersStatusBarHidden`); following a finger
-through a transition; Android's bars; `theme-color`.
+Hiding the status bar from an app (a game can: Addendum A); following a
+finger through a transition; Android's bars; `theme-color`.
 
 ## 4. Tests
 
@@ -153,3 +153,26 @@ Astra (max) NOT READY, Grok (xhigh) READY WITH CHANGES. Taken:
 - **Validation, embedder, web skips, agent report (both)** (D1, D6, D7).
 - **Same frame (Astra):** resolved synchronously at the end of the
   outermost batch; screen-capture verification stays an acceptance check.
+
+## Addendum A (2026-11-11): Games can hide the status bar
+
+A game's `app.json` may set `game.statusBar` to `"visible"` (the default)
+or `"hidden"`. Hidden, the system status bar is gone on iOS for the whole
+run. Nothing else changes for an app that does not set it. Android keeps
+its bar.
+
+**Why games only.** A game draws its own full-screen HUD over its world,
+and a status bar over that HUD is a bar the game did not draw. An app keeps
+the platform's bar, as a hand-built app would (LLP 1115); its say over the
+bar is the style above. The key is static: a game hides the bar for its
+whole run, so it is a manifest key, not a prop bound to state.
+
+**iOS.** The build writes `UIStatusBarHidden` (hidden from launch) and
+`ExactStatusBarHidden` into the Info.plist. UIKit then asks the controller
+that owns the bar (Apple, `prefersStatusBarHidden`): the standalone
+adapter's root and a full-screen presentation both answer
+`StatusBarVisibility.hidden`, which reads `ExactStatusBarHidden`.
+
+**Safe areas.** The host keeps reporting UIKit's live insets, so the top
+safe area is what UIKit says with the bar hidden: on an iPhone with a
+sensor housing, still that housing's.

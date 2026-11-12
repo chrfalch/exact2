@@ -169,6 +169,11 @@
             "type": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*$" }
           }
         },
+        "statusBar": {
+          "enum": ["visible", "hidden"],
+          "default": "visible",
+          "description": "The system status bar on iOS (LLP 1105 Addendum A). \"hidden\" gives the game the whole screen for its own HUD."
+        },
         "type": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*$" }
       }
     },

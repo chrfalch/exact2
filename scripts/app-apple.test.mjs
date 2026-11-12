@@ -250,6 +250,18 @@ test('`appTransportSecurity` writes ATS for web content only; absent, no key (#1
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('`game.statusBar: "hidden"` hides the iOS status bar from launch; otherwise the plist has no status bar key (LLP 1105 Addendum A)', () => {
+  const app = (manifest) => ({ id: 'com.example.fixture', displayName: 'Fixture', manifest: { host: {}, ...manifest } });
+  const game = (extra) => ({ game: { crate: 'fixture-logic', type: 'Fixture', ...extra } });
+  const flat = (plist) => plist.replace(/>\s+</g, '><');
+  const hidden = flat(infoPlist(app(game({ statusBar: 'hidden' }))));
+  assert.match(hidden, /<key>UIStatusBarHidden<\/key><true\/>/);
+  assert.match(hidden, /<key>ExactStatusBarHidden<\/key><true\/>/);
+  for (const plist of [infoPlist(app(game({}))), infoPlist(app(game({ statusBar: 'visible' }))), infoPlist(app({})), infoPlist(app(game({ statusBar: 'hidden' })), false, { tv: true })]) {
+    assert.doesNotMatch(plist, /StatusBarHidden/);
+  }
+});
+
 test('`allowsArbitraryLoads` turns ATS off on macOS, iOS and tvOS, written alone so ATS does not ignore it', async () => {
   const { readManifest } = await import('./app.mjs');
   const app = (host) => ({ id: 'com.example.fixture', displayName: 'Fixture', manifest: { host } });

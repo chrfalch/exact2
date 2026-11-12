@@ -132,7 +132,7 @@ generate its hosts, Cargo workspace and lock, ignored, under `.shells/`.
 | `proof.mjs`, `logic/tests/*.rs` | Real-host assertions and hostless simulation tests |
 | `app.test.contract` | Menus and HUD driven on a host (`bun scripts/agent.mjs <host> --test`) |
 | `pins.json` | Verified tick/save baselines, written by `prove.mjs` |
-| `app.json` (optional) | Authored keys only: a title, bundle id, `game.audio`, `game.assets`, `game.look`, data and render crates |
+| `app.json` (optional) | Authored keys only: a title, bundle id, `game.audio`, `game.assets`, `game.look`, `game.statusBar` (`"hidden"`: no status bar on iOS), data and render crates |
 | `logic/Cargo.toml`, `Cargo.lock` (optional) | Only when the game adds dependencies ([below](#exact2-integration)) |
 
 The crate is `<Game::ID>-logic` and the bundle id `com.exact.<Game::ID>`; the title

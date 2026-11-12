@@ -125,5 +125,36 @@ final class StatusBarIOSTests: XCTestCase {
         p.apply(wireBatch([["op": "props", "id": 3, "set": [:], "clear": ["statusBarStyle", "statusBarAnimation"]]]))
         XCTAssertEqual(told.map(\.style), [.darkContent, .lightContent])
     }
+
+    /// Addendum A: a game's `game.statusBar: "hidden"`, baked into the
+    /// Info.plist as `ExactStatusBarHidden`.
+    func testTheBakedKeyHidesTheBar() {
+        XCTAssertTrue(StatusBarVisibility.hidden(in: ["ExactStatusBarHidden": true]))
+        XCTAssertFalse(StatusBarVisibility.hidden(in: ["ExactStatusBarHidden": false]))
+        XCTAssertFalse(StatusBarVisibility.hidden(in: [:]), "an app that never set it")
+        XCTAssertFalse(StatusBarVisibility.hidden(in: nil))
+    }
+
+    /// A full-screen presentation is the controller UIKit asks while it is
+    /// up: it hides the bar exactly when the root does.
+    func testAFullScreenPresentationFollowsTheBakedKey() throws {
+        let baked = StatusBarVisibility.hidden
+        defer { StatusBarVisibility.hidden = baked }
+        let p = presenter()
+        let owner = UIViewController(), background = UIViewController()
+        window.rootViewController = owner
+        addTeardownBlock { owner.presentedViewController?.dismiss(animated: false) }
+        p.apply(wireBatch([
+            ["op": "create", "id": 90, "kind": "view", "props": ["navigationPresentation": "fullscreen"]],
+            ["op": "roots", "ids": [90]],
+        ]))
+        p.modals.present(try XCTUnwrap(p.views[90]), navigation: UIViewController(), from: background, preceding: nil, owner: owner)
+        let presented = try XCTUnwrap(p.modals.owner)
+        XCTAssertEqual(presented.modalPresentationStyle, .overFullScreen)
+        for hidden in [true, false] {
+            StatusBarVisibility.hidden = hidden
+            XCTAssertEqual(presented.prefersStatusBarHidden, hidden)
+        }
+    }
 }
 #endif

@@ -62,3 +62,7 @@ export function nfcKeys(ios, tv) {
     ...(nfc.felicaSystemCodes?.length ? { 'com.apple.developer.nfc.readersession.felica.systemcodes': nfc.felicaSystemCodes } : {}),
   };
 }
+
+/** A game's `game.statusBar: "hidden"` (LLP 1105 Addendum A): `UIStatusBarHidden` hides the bar at launch; after it,
+ * UIKit asks the controllers, which read `ExactStatusBarHidden`. Nothing on tvOS, which has no status bar. */
+export const statusBarKeys = (manifest, tv) => (!tv && manifest.game?.statusBar === 'hidden' ? { UIStatusBarHidden: true, ExactStatusBarHidden: true } : {});

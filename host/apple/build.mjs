@@ -54,7 +54,7 @@ import { appleImplementations } from '../../js/bake/src/typescript.mjs';
 import { composedModule, moduleSeam, systemFrameworks } from './compose.mjs';
 import { associatedDomains, entitlementValue, macPresence, macPasskeys, macProfileRows, merchantEntitlement, signInEntitlement } from './presence.mjs';
 import { writeDataKeys } from './data-keys.mjs';
-import { backgroundKeys, localNetworking, nfcKeys, startLocation, transportSecurity, updateActivation } from './plist.mjs';
+import { backgroundKeys, localNetworking, nfcKeys, startLocation, statusBarKeys, transportSecurity, updateActivation } from './plist.mjs';
 import { compileFixtures, iosTestRuns, macTests, onlyClasses } from './xctest.mjs';
 import { appIcon, buildInfo, iosAssets, appleAssets, appleAssetCatalogInventory, copyMacResources, signingOrder, helperEntitlements, plistFile, wrapFramework, signedGpuProduct, assertArchiveFrameworks } from './assets.mjs';
 import { auditLaunchParts, launchModules, launchServices, serviceArgs, writeLaunchParts } from './launch-parts.mjs';
@@ -450,7 +450,7 @@ export const infoPlist = (app, device = false, { executable = executableName(app
     ...(activityEntries(app).length ? { NSSupportsLiveActivities: true, ...(activityEntries(app).some(e => e.frequent === true) ? { NSSupportsLiveActivitiesFrequentUpdates: true } : {}) } : {}) });
   Object.assign(dict, transportSecurity(ios, localNetworking(ios, reach), { web: !tv }));
   if (ios.localNetworking) dict.NSLocalNetworkUsageDescription = typeof ios.localNetworking === 'string' ? ios.localNetworking : 'Connects to your dev server on the local network.';
-  Object.assign(dict, backgroundKeys(ios, reach, id, tv || clip), nfcKeys(ios, tv), startLocation(app));
+  Object.assign(dict, backgroundKeys(ios, reach, id, tv || clip), nfcKeys(ios, tv), startLocation(app), statusBarKeys(app.manifest, tv));
   // The schemes `canOpenURL` may ask about; iOS answers false for any other (`UIApplication.canOpenURL(_:)`)
   if (ios.queriesSchemes?.length) dict.LSApplicationQueriesSchemes = ios.queriesSchemes;
   // @ref LLP 1096 D8 — the audio session's category, which ExactKit's one owner reads.

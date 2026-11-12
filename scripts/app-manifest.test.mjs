@@ -271,6 +271,15 @@ test('watchFamilies admits only the four accessory families', async () => {
   } finally { rmSync(dir,{recursive:true,force:true}); }
 });
 
+test('game.statusBar is "visible" or "hidden"', async () => {
+  const {validate} = await import('./app.mjs');
+  const schema = await Bun.file(new URL('./app.schema.json', import.meta.url)).json();
+  const game = statusBar => validate({ crate: 'fixture-logic', type: 'Fixture', statusBar }, schema.properties.game, 'game', schema);
+  assert.deepEqual(game('visible'), []);
+  assert.deepEqual(game('hidden'), []);
+  for (const bad of ['translucent', true, '']) assert.ok(game(bad).length, JSON.stringify(bad));
+});
+
 test('activity labels reject whitespace and control characters in schema validation', async () => {
   const {validate} = await import('./app.mjs');
   const schema = await Bun.file(new URL('./app.schema.json', import.meta.url)).json();

@@ -122,4 +122,12 @@ extension Presenter {
         return .default
     }
 }
+
+/// A game's `game.statusBar: "hidden"` (Addendum A), baked into the
+/// Info.plist as `ExactStatusBarHidden`: every controller UIKit asks for the
+/// bar's visibility answers this. Settable for tests.
+package enum StatusBarVisibility {
+    nonisolated(unsafe) package static var hidden = hidden(in: Bundle.main.infoDictionary)
+    static func hidden(in info: [String: Any]?) -> Bool { info?["ExactStatusBarHidden"] as? Bool == true }
+}
 #endif
